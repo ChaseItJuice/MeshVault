@@ -54,20 +54,22 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown logic."""
     Base.metadata.create_all(bind=engine)
     
-    # Run idempotent SQLite migration for is_restricted
-    db = SessionLocal()
-    try:
-        res = db.execute(text("PRAGMA table_info(workspaces)")).fetchall()
-        columns = [r[1] for r in res]
-        if "is_restricted" not in columns:
-            db.execute(text("ALTER TABLE workspaces ADD COLUMN is_restricted BOOLEAN DEFAULT 0"))
-            db.commit()
-            print("  Migration: Added column 'is_restricted' to 'workspaces' table.")
-    except Exception as e:
-        print(f"  Migration error: {e}")
-        db.rollback()
-    finally:
-        db.close()
+    # Run idempotent SQLite migration for is_restricted (only for SQLite dev)
+    from config import DATABASE_URL as _db_url
+    if "sqlite" in _db_url:
+        db = SessionLocal()
+        try:
+            res = db.execute(text("PRAGMA table_info(workspaces)")).fetchall()
+            columns = [r[1] for r in res]
+            if "is_restricted" not in columns:
+                db.execute(text("ALTER TABLE workspaces ADD COLUMN is_restricted BOOLEAN DEFAULT 0"))
+                db.commit()
+                print("  Migration: Added column 'is_restricted' to 'workspaces' table.")
+        except Exception as e:
+            print(f"  Migration error: {e}")
+            db.rollback()
+        finally:
+            db.close()
 
     print()
     print("=" * 50)
@@ -95,17 +97,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow the Vite dev server
+# CORS — read explicit origins from ALLOWED_ORIGINS env var
+from config import ALLOWED_ORIGINS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://localhost:5176",
-        "http://localhost:3000",
-    ],
-    allow_credentials=True,
+    allow_origins=ALLOWED_ORIGINS if ALLOWED_ORIGINS else ["*"],
+    allow_credentials=bool(ALLOWED_ORIGINS),
     allow_methods=["*"],
     allow_headers=["*"],
 )
