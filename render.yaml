@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: meshvault-backend
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python seed.py && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        fromDatabase:
+          name: meshvault-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: "*"
+
+databases:
+  - name: meshvault-db
+    plan: free
+    databaseName: meshvault
+    user: meshvault_user
+    region: oregon
